@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EIDS Pro V2280 BY TTTian</title>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --sidebar-w: 300px;
+            --primary: #2c3e50;
+            --accent: #3498db;
+            --bg: #f4f7f6;
+            --border: #dcdfe6;
+            --text: #303133;
+            --danger: #f56c6c;
+            --success: #2ecc71;
+            --warning: #f39c12;
+            --purple: #9b59b6;
+            --info: #17a2b8;
+        }
+        body { font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; margin: 0; background: var(--bg); display: flex; height: 100vh; overflow: hidden; color: var(--text); }
+
+        /* --- 布局 (Layout) --- */
+        #sidebar { width: var(--sidebar-w); background: var(--primary); color: #ecf0f1; display: flex; flex-direction: column; box-shadow: 2px 0 10px rgba(0,0,0,0.1); user-select: none; }
+        .sb-header { padding: 15px 20px; font-weight: bold; font-size: 1.1rem; border-bottom: 1px solid #34495e; background: #243342; display: flex; align-items: center; justify-content: space-between; }
+        .sb-content { flex: 1; overflow-y: auto; padding-top: 10px; }
+        #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        header { height: 60px; background: #fff; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
+        /* [修改] 移除 scroll-behavior，完全由JS控制滚动速度 */
+        #workspace { flex: 1; overflow-y: auto; padding: 25px; position: relative; }
+
+        /* --- 单机卡片 (Unit Box) --- */
+        .unit-box { 
+            background: #fff; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.05); margin-bottom: 30px; 
+            border: 1px solid #ebeef5;
+            transition: background-color 0.3s ease; 
+        }
+        .unit-header-panel { 
+            padding: 12px 20px; border-bottom: 1px solid rgba(0,0,0,0.05); display: flex; gap: 15px; align-items: center; 
+            background: rgba(255,255,255,0.6); border-radius: 8px 8px 0 0; flex-wrap: wrap;
+        }
+        
+        /* --- 连接器块 (Connector Block) --- */
+        .conn-block { 
+            border: 1px solid #ebeef5; border-radius: 4px; padding: 15px; margin: 15px 20px; 
+            background: #fff; position: relative; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.02); 
+        }
+        .conn-block:hover { border-color: #c0c4cc; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        
+        /* 高亮动画：快速闪烁 */
+        @keyframes highlight-pulse {
+            0% { box-shadow: 0 0 0 0 rgba(52, 152, 219, 0.7); border-color: var(--accent); transform: scale(1); }
+            30% { box-shadow: 0 0 15px 5px rgba(52, 152, 219, 0.3); border-color: var(--accent); transform: scale(1.02); }
+            100% { box-shadow: 0 1px 3px rgba(0,0,0,0.02); border-color: #ebeef5; transform: scale(1); }
+        }
+        .highlight-target { animation: highlight-pulse 1s ease-out; }
+
+        /* --- 导航栏 (Navigation) --- */
+        .nav-unit-group { border-bottom: 1px solid #34495e; }
+        .nav-unit-title { padding: 12px 15px; display: flex; align-items: center; font-weight: 600; font-size: 0.9rem; cursor: default; }
+        .nav-unit-title:hover { background: #34495e; }
+        .nav-icon-area { padding: 4px; cursor: pointer; width: 24px; text-align: center; opacity: 0.7; }
+        .nav-text-area { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; padding-left: 5px; }
+        
+        .nav-conn-list { background: #1f2c39; overflow: hidden; }
+        .nav-conn-item { 
+            padding: 8px 15px 8px 42px; cursor: pointer; font-size: 0.85rem; color: #bdc3c7; border-left: 3px solid transparent; 
+            display: flex; justify-content: space-between; align-items: center; 
+        }
+        .nav-conn-item:hover, .nav-conn-item.active { color: #fff; background: #2c3e50; }
+        .nav-conn-item.active { border-left-color: var(--accent); }
+        .nav-left { display: flex; align-items: center; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin-right: 10px; }
+        .nav-model { font-size: 0.75em; color: #7f8c8d; flex-shrink: 0; }
+
+        /* --- 控件 (Controls) --- */
+        .ctrl-row { display: flex; gap: 15px; margin-bottom: 12px; align-items: flex-end; flex-wrap: wrap; }
+        .ctrl-grp { display: flex; flex-direction: column; }
+        .ctrl-grp label { font-size: 12px; color: #909399; margin-bottom: 4px; font-weight: bold; }
+        
+        input, select { 
+            height: 32px; padding: 0 8px; border: 1px solid #dcdfe6; border-radius: 4px; font-size: 13px; color: #606266; 
+            outline: none; transition: border 0.2s; background: rgba(255,255,255,0.8); 
+        }
+        input:focus, select:focus { border-color: var(--accent); background: #fff; }
+        
+        .w-code { width: 100px; font-weight: bold; }
+        .w-name-short { width: 140px; }
+        .w-series { width: 160px; }
+        .w-model { width: 220px; font-family: 'Consolas', monospace; font-weight: bold; }
+
+        /* --- 警告标签 --- */
+        .conn-warning-container { display: flex; gap: 5px; margin-left: 10px; }
+        .conn-warning {
+            display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 4px;
+            font-size: 12px; font-weight: bold; cursor: help; white-space: nowrap;
+        }
+        .warn-error { background-color: #fef0f0; color: #f56c6c; border: 1px solid #fde2e2; }
+        .warn-unknown { background-color: #fdf6ec; color: #e6a23c; border: 1px solid #faecd8; }
+
+        /* --- 表格 (Table) --- */
+        .pin-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 5px; border: 1px solid #dcdfe6; table-layout: fixed; background: #fff; }
+        .pin-table th { 
+            background: #f5f7fa; color: #909399; font-weight: 600; text-align: left; padding: 8px 8px; 
+            border: 1px solid #dcdfe6; white-space: nowrap; 
+        }
+        .pin-table td { padding: 0; height: 30px; border: 1px solid #ebeef5; }
+        .pin-table input, .pin-table select { 
+            width: 100%; height: 100%; border: none; border-radius: 0; background: transparent; 
+            padding: 0 8px; box-sizing: border-box; display: block; outline: none; 
+        }
+        .pin-table input:focus, .pin-table select:focus { box-shadow: inset 0 0 0 2px var(--accent); background: #fff; }
+        
+        .tr-used { background-color: #f0f0f0 !important; color: #aaa !important; }
+        .tr-used input, .tr-used select { color: #999; }
+        .tr-used input:focus, .tr-used select:focus { background: #f0f0f0; }
+        
+        /* --- 按钮 (Buttons) --- */
+        .btn { 
+            padding: 0 15px; height: 32px; border-radius: 4px; border: none; cursor: pointer; font-size: 13px; 
+            display: inline-flex; align-items: center; justify-content: center; transition: 0.2s; white-space: nowrap; 
+        }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-warning { background: var(--warning); color: white; }
+        .btn-purple { background: var(--purple); color: white; }
+        .btn-info { background: var(--info); color: white; }
+        .btn-danger-light { color: var(--danger); background: #fef0f0; border: 1px solid #fbc4c4; }
+        .btn-danger-solid { background: var(--danger); color: white; }
+        .btn-text { background: transparent; color: #606266; }
+        .btn-picker { 
+            padding: 0 8px; height: 28px; background: #ecf0f1; border: 1px solid #bdc3c7; border-radius: 3px; 
+            cursor: pointer; color: #333; font-weight: bold; margin-right: 2px; 
+        }
+
+        .btn-jump {
+            width: 24px; height: 100%; border: none; background: transparent;
+            cursor: pointer; color: var(--accent); font-weight: bold; padding: 0;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .btn-jump:hover { background-color: #eaf6ff; }
+
+        .color-mode-switch { display: flex; align-items: center; gap: 5px; margin-right: 15px; cursor: pointer; font-size: 13px; font-weight: bold; color: #555; user-select: none; }
+        .color-mode-switch input { height: 16px; width: 16px; accent-color: var(--accent); cursor: pointer; }
+
+        /* --- 模态框 (Modals) --- */
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; display: none; align-items: center; justify-content: center; }
+        .modal { background: white; border-radius: 6px; box-shadow: 0 5px 20px rgba(0,0,0,0.2); width: 600px; max-height: 80vh; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; }
+        .modal-header { font-size: 1.2rem; font-weight: bold; margin-bottom: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px; display: flex; justify-content: space-between; }
+        .modal-body { flex: 1; overflow-y: auto; }
+        
+        /* 库管理 & 信号Grid */
+        .lib-toolbar { display: flex; flex-direction: column; gap: 10px; background: #f9f9f9; padding: 15px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #eee; }
+        .lib-row { display: flex; gap: 10px; align-items: center; }
+        .lib-series-block { margin-bottom: 8px; border: 1px solid #e0e0e0; border-radius: 4px; overflow: hidden; background: #fff; }
+        .lib-series-header { padding: 10px 15px; background: #f1f3f5; display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; transition: background 0.2s; }
+        .lib-series-header:hover { background: #e9ecef; }
+        .lib-arrow { display: inline-block; width: 16px; font-size: 0.8em; transition: transform 0.2s; color: #7f8c8d; }
+        .lib-series-content { display: none; padding: 0; border-top: 1px solid #e0e0e0; }
+        .lib-series-block.expanded .lib-series-content { display: block; }
+        .lib-series-block.expanded .lib-arrow { transform: rotate(90deg); }
+        .lib-model-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .lib-model-table td { padding: 8px 15px; border-bottom: 1px solid #f5f5f5; }
+        .lib-col-model { font-family: 'Consolas', monospace; font-weight: 600; color: #34495e; }
+        .lib-col-pins { color: #e67e22; font-weight: bold; width: 60px; text-align: center; }
+        .lib-col-action { width: 60px; text-align: right; }
+
+        .sig-category { margin-bottom: 15px; }
+        .sig-cat-title { font-size: 0.9rem; font-weight: bold; color: var(--accent); margin-bottom: 5px; border-bottom: 2px solid #eee; padding-bottom: 2px; }
+        .sig-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+        .sig-item { padding: 6px; background: #f8f9fa; border: 1px solid #eee; text-align: center; cursor: pointer; font-size: 0.85rem; border-radius: 4px; }
+        .sig-item:hover { background: #e8f0fe; border-color: var(--accent); color: var(--accent); }
+    </style>
+</head>
+<body>
+
+<datalist id="volt-list">
+    <option value="3.3V"><option value="5V"><option value="6V"><option value="12V"><option value="28V"><option value="42V"><option value="100V">
+</datalist>
+
+<div id="signalModal" class="modal-overlay"><div class="modal"><div class="modal-header"><span>选择信号类型</span><button class="btn btn-text" onclick="closeModal('signalModal')">✕</button></div><div id="signalContent"></div></div></div>
+<div id="libManagerModal" class="modal-overlay"><div class="modal" style="width: 900px; height: 750px;"><div class="modal-header"><span>📚 连接器型号库管理</span><button class="btn btn-text" onclick="closeModal('libManagerModal')">✕</button></div><div class="lib-toolbar"><div class="lib-row"><span style="font-weight:bold; color:#555; width:40px;">添加:</span><input id="newSeries" placeholder="系列名称 (如: J30J)" style="width:150px;"><input id="newModel" placeholder="具体型号 (如: J30J-9T)" style="flex:1;"><input id="newPins" type="number" placeholder="芯数" style="width:60px;"><button class="btn btn-success" onclick="addLibConn()">+ 添加</button></div><div style="border-top:1px dashed #ddd; margin: 5px 0;"></div><div class="lib-row"><span style="font-weight:bold; color:#555; width:40px;">Excel:</span><input type="file" id="excelLibIn" hidden accept=".xlsx,.xls" onchange="handleLibImport(this)"><button class="btn btn-danger-light" onclick="triggerImport('replace', 'connector')">🔥 覆盖导入</button><button class="btn btn-info" onclick="triggerImport('merge', 'connector')">➕ 增量导入</button><div style="flex:1"></div><button class="btn btn-primary" onclick="exportLibToExcel('connector')">📥 导出Excel</button></div></div><div class="modal-body" id="libTreeContainer"></div></div></div>
+<div id="sigManagerModal" class="modal-overlay"><div class="modal" style="width: 800px; height: 600px;"><div class="modal-header"><span>📶 信号类型库管理</span><button class="btn btn-text" onclick="closeModal('sigManagerModal')">✕</button></div><div class="lib-toolbar"><div class="lib-row"><span style="font-weight:bold; color:#555; width:40px;">添加:</span><input id="newSigCat" placeholder="信号分类 (如: 供电)" style="width:150px;"><input id="newSigName" placeholder="信号名称 (如: 28V_MAIN)" style="flex:1;"><button class="btn btn-success" onclick="addSigLib()">+ 添加</button></div><div style="border-top:1px dashed #ddd; margin: 5px 0;"></div><div class="lib-row"><span style="font-weight:bold; color:#555; width:40px;">Excel:</span><input type="file" id="excelSigIn" hidden accept=".xlsx,.xls" onchange="handleSigImport(this)"><button class="btn btn-danger-light" onclick="triggerImport('replace', 'signal')">🔥 覆盖导入</button><button class="btn btn-info" onclick="triggerImport('merge', 'signal')">➕ 增量导入</button><div style="flex:1"></div><button class="btn btn-primary" onclick="exportLibToExcel('signal')">📥 导出Excel</button></div></div><div class="modal-body" id="sigTreeContainer"></div></div></div>
+
+<div id="sidebar">
+    <div class="sb-header"><span>🛰️ EIDS Pro V22.8</span></div>
+    <div class="sb-content" id="nav-tree"></div>
+    <div style="padding: 15px;"><button class="btn btn-success" style="width:100%" onclick="addUnit()">+ 新建单机</button></div>
+</div>
+
+<div id="main">
+    <header>
+        <div style="display:flex; align-items:center; gap:10px;">
+            <button class="btn btn-warning" onclick="openLibManager()">📚 连接器库管理</button>
+            <button class="btn btn-purple" onclick="openSigManager()">📶 信号库管理</button>
+            <span style="border-right:1px solid #ddd; height:20px; margin:0 10px;"></span>
+            <button class="btn btn-danger-light" onclick="resetProject()">⚠️ 重置</button>
+            <label style="margin-left:10px;">卫星名称:</label><input type="text" id="p-code" value="SAT-01" onchange="save()" style="width:120px; font-weight:bold;">
+            <label style="margin-left:10px;">版本号:</label><input type="text" id="p-ver" value="V1.0" onchange="save()" style="width:60px; font-weight:bold; color:#e67e22;">
+        </div>
+        <div style="display:flex; align-items:center;">
+            <label class="color-mode-switch"><input type="checkbox" id="chkColorMode" onchange="toggleColorMode()"> 🎨 色彩模式</label>
+            <span style="border-right:1px solid #ddd; height:20px; margin:0 15px;"></span>
+            <input type="file" id="fileIn" hidden onchange="importJSON(this)" accept=".json">
+            <button class="btn btn-text" onclick="document.getElementById('fileIn').click()">📂 导入配置</button>
+            <button class="btn btn-primary" onclick="exportJSON()">📥 导出配置</button>
+        </div>
+    </header>
+    <div id="workspace"></div>
+</div>
+
+<input type="file" id="unitExcelIn" hidden accept=".xlsx,.xls" onchange="handleUnitImport(this)">
+
+<script>
+    const MACARON_COLORS = ['#ffebee','#f3e5f5','#e3f2fd','#e8f5e9','#fff3e0','#fbe9e7','#e0f7fa','#fffde7'];
+    const DEFAULT_SIGNAL_LIB = { "⚡ 供电": ["28V_BUS_MAIN", "28V_BUS_RTN", "28V_SEC", "GND (Structure)", "+5V_LOGIC"], "📡 总线/通讯": ["CAN_H", "CAN_L", "RS422_TX+", "RS422_TX-", "RS422_RX+", "RS422_RX-", "1553B_A", "1553B_B"], "📈 模拟量": ["TEMP_SENSOR", "HEATER+", "HEATER-", "VOLTAGE_TM", "CURRENT_TM", "THERMISTOR"], "🕹️ 控制/离散": ["PULSE_CMD", "LEVEL_CMD", "SWITCH_STATUS", "PPS_P", "PPS_N", "ENABLE", "RESET"] };
+    const DEFAULT_CONN_LIB = { "J30J (微矩形/螺钉锁)": { "J30J-9TJL": 9, "J30J-9ZKP": 9, "J30J-15TJL": 15, "J30J-25TJL": 25, "J30J-37TJL": 37, "J30J-51TJL": 51, "J30J-100TJL": 100 }, "J30JA (微矩形/快锁)": { "J30JA-9TJL": 9, "J30JA-15TJL": 15, "J30JA-21TJL": 21, "J30JA-31TJL": 31, "J30JA-37TJL": 37 }, "J14A (中小功率)": { "J14A-9TJ": 9, "J14A-15TJ": 15, "J14A-26TJ": 26, "J14A-38TJ": 38, "J14A-51TJ": 51 }, "J599 (GJB599/III系列)": { "J599-III-0935 (6芯)": 6, "J599-III-1135 (13芯)": 13, "J599-III-1535 (37芯)": 37, "J599-III-1735 (55芯)": 55 }, "Y11 (GJB101A)": { "Y11-0804": 4, "Y11-1007": 7, "Y11-1212": 12 }, "SMA (射频)": { "SMA-K": 1, "SMA-J": 1, "SMA-KFD": 1 } };
+    const REF_OPTS = Array.from({length:99}, (_,i) => `X${String(i+1).padStart(2,'0')}`);
+    
+    let appData = { project: "SAT-01", version: "V1.0", units: [], connectorLib: {}, signalLib: {}, colorMode: false };
+    let currentImportUnitIdx = -1;
+
+    window.onload = () => {
+        const saved = localStorage.getItem('eids_v22');
+        if(saved) { try { appData = JSON.parse(saved); } catch(e) {} } else { appData.connectorLib = JSON.parse(JSON.stringify(DEFAULT_CONN_LIB)); appData.signalLib = JSON.parse(JSON.stringify(DEFAULT_SIGNAL_LIB)); addUnit(); }
+        if(!appData.connectorLib || Object.keys(appData.connectorLib).length === 0) appData.connectorLib = JSON.parse(JSON.stringify(DEFAULT_CONN_LIB));
+        if(!appData.signalLib || Object.keys(appData.signalLib).length === 0) appData.signalLib = JSON.parse(JSON.stringify(DEFAULT_SIGNAL_LIB));
+        if(appData.colorMode === undefined) appData.colorMode = false;
+        document.getElementById('p-code').value = appData.project; document.getElementById('p-ver').value = appData.version; document.getElementById('chkColorMode').checked = appData.colorMode;
+        render();
+    };
+
+    function save() { appData.project = document.getElementById('p-code').value; appData.version = document.getElementById('p-ver').value; localStorage.setItem('eids_v22', JSON.stringify(appData)); renderNav(); }
+
+    function triggerUnitImport(uIdx) { currentImportUnitIdx = uIdx; document.getElementById('unitExcelIn').click(); }
+    function exportUnitToExcel(uIdx) {
+        const unit = appData.units[uIdx]; const wb = XLSX.utils.book_new();
+        if(unit.connectors.length === 0) { alert("无连接器"); return; }
+        unit.connectors.forEach(conn => {
+            const wsData = [["属性", "值"], ["Designator", conn.designator], ["ConnName", conn.connName], ["Series", conn.series], ["Model", conn.model], [], ["Pin", "Signal", "Voltage", "Current", "DestUnit", "DestConn", "Remark", "Status"]];
+            conn.pins.forEach(p => wsData.push([p.no, p.signal, p.voltage, p.current, p.destUnit, p.destConn || "", p.remark, p.isUsed?"Used":""]));
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(wsData), (conn.designator || "Conn").replace(/[\/\\\?\*\]\[]/g, ""));
+        });
+        XLSX.writeFile(wb, `${appData.project}_${unit.refDes}_${unit.name}_Interfaces.xlsx`);
+    }
+
+    function handleUnitImport(input) {
+        const file = input.files[0]; if(!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const workbook = XLSX.read(new Uint8Array(e.target.result), {type: 'array'});
+                const unit = appData.units[currentImportUnitIdx]; const newConnectors = [];
+                workbook.SheetNames.forEach(sheetName => {
+                    const rawData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {header: 1});
+                    if(rawData.length > 6) {
+                        const meta = {};
+                        for(let i=0; i<5; i++) { if(rawData[i] && rawData[i].length>=2) { const k=String(rawData[i][0]); const v=rawData[i][1]; if(k.includes("Designator")||k.includes("代号")) meta.designator=v; if(k.includes("ConnName")||k.includes("名称")) meta.connName=v; if(k.includes("Series")||k.includes("系列")) meta.series=v; if(k.includes("Model")||k.includes("型号")) meta.model=v; } }
+                        const pins = [];
+                        for(let i=7; i<rawData.length; i++) { const row=rawData[i]; if(row && row[0]!==undefined) pins.push({ no: String(row[0]), signal: row[1]||"NC", voltage: row[2]||"", current: row[3]||"", destUnit: row[4]||"", destConn: row[5]||"", remark: row[6]||"", isUsed: String(row[7]||"").toLowerCase().includes("used") }); }
+                        pins.sort((a,b)=>a.no.localeCompare(b.no, undefined, {numeric:true, sensitivity:'base'}));
+                        newConnectors.push({ id: Date.now()+Math.random(), designator: meta.designator||sheetName, connName: meta.connName||"", series: meta.series||"", model: meta.model||"", pins: pins });
+                    }
+                });
+                if(newConnectors.length>0 && confirm(`解析到 ${newConnectors.length} 个连接器，是否覆盖？`)) { unit.connectors = newConnectors; save(); render(); alert("导入成功"); }
+            } catch(err) { alert("Excel 解析失败"); }
+        }; reader.readAsArrayBuffer(file); input.value = '';
+    }
+
+    function openLibManager() { document.getElementById('libManagerModal').style.display = 'flex'; renderLibTree(); }
+    function openSigManager() { document.getElementById('sigManagerModal').style.display = 'flex'; renderSigLibTree(); }
+    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+    function renderLibTree() {
+        const container = document.getElementById('libTreeContainer'); container.innerHTML = '';
+        for(let series in appData.connectorLib) {
+            const models = appData.connectorLib[series];
+            const block = document.createElement('div'); block.className = 'lib-series-block';
+            block.innerHTML = `<div class="lib-series-header" onclick="this.parentElement.classList.toggle('expanded')"><div><span class="lib-arrow">▶</span> <span class="lib-series-title">${series}</span></div><button class="btn btn-danger-light" style="padding:2px 8px; font-size:12px;" onclick="delLibSeries('${series}')">删除</button></div><div class="lib-series-content"><table class="lib-model-table">${Object.keys(models).map(m=>`<tr><td class="lib-col-model">${m}</td><td class="lib-col-pins">${models[m]} Pin</td><td class="lib-col-action"><button class="btn btn-text btn-danger-solid" style="padding:2px 5px;" onclick="delLibModel('${series}','${m}')">删除</button></td></tr>`).join('')}</table></div>`;
+            container.appendChild(block);
+        }
+    }
+    function renderSigLibTree() {
+        const container = document.getElementById('sigTreeContainer'); container.innerHTML = '';
+        for(let cat in appData.signalLib) {
+            const signals = appData.signalLib[cat];
+            const block = document.createElement('div'); block.className = 'lib-series-block';
+            block.innerHTML = `<div class="lib-series-header" onclick="this.parentElement.classList.toggle('expanded')"><div><span class="lib-arrow">▶</span> <span class="lib-series-title">${cat}</span></div><button class="btn btn-danger-light" style="padding:2px 8px; font-size:12px;" onclick="delSigCat('${cat}')">删除</button></div><div class="lib-series-content"><table class="lib-model-table">${signals.map((s,i)=>`<tr><td class="lib-col-model">${s}</td><td class="lib-col-action"><button class="btn btn-text btn-danger-solid" style="padding:2px 5px;" onclick="delSigItem('${cat}',${i})">删除</button></td></tr>`).join('')}</table></div>`;
+            container.appendChild(block);
+        }
+    }
+    function addLibConn() { const s=document.getElementById('newSeries').value.trim(), m=document.getElementById('newModel').value.trim(), p=parseInt(document.getElementById('newPins').value); if(!s||!m||!p)return; if(!appData.connectorLib[s]) appData.connectorLib[s]={}; appData.connectorLib[s][m]=p; save(); renderLibTree(); render(); }
+    function addSigLib() { const c=document.getElementById('newSigCat').value.trim(), n=document.getElementById('newSigName').value.trim(); if(!c||!n)return; if(!appData.signalLib[c]) appData.signalLib[c]=[]; if(!appData.signalLib[c].includes(n)) appData.signalLib[c].push(n); save(); renderSigLibTree(); }
+    function delLibSeries(s) { if(confirm("删除?")) { delete appData.connectorLib[s]; save(); renderLibTree(); render(); } }
+    function delLibModel(s,m) { if(confirm("删除?")) { delete appData.connectorLib[s][m]; save(); renderLibTree(); render(); } }
+    function delSigCat(c) { if(confirm("删除?")) { delete appData.signalLib[c]; save(); renderSigLibTree(); } }
+    function delSigItem(c,i) { if(confirm("删除?")) { appData.signalLib[c].splice(i,1); save(); renderSigLibTree(); } }
+    let importMode='', importType='';
+    function triggerImport(m,t) { importMode=m; importType=t; document.getElementById(t==='connector'?'excelLibIn':'excelSigIn').click(); }
+    function handleLibImport(i) { processImport(i,'connector'); } function handleSigImport(i) { processImport(i,'signal'); }
+    function processImport(input, type) {
+        const file=input.files[0]; if(!file)return;
+        const reader=new FileReader(); reader.onload=function(e){
+            try {
+                const rows=XLSX.utils.sheet_to_json(XLSX.read(new Uint8Array(e.target.result),{type:'array'}).Sheets[XLSX.read(new Uint8Array(e.target.result),{type:'array'}).SheetNames[0]]);
+                if(importMode==='replace') { if(!confirm("确定覆盖?"))return; if(type==='connector') appData.connectorLib={}; else appData.signalLib={}; }
+                rows.forEach(r=>{ 
+                    if(type==='connector'){ const s=r.Series||r['系列'], m=r.Model||r['型号'], p=r.Pins||r['芯数']; if(s&&m&&p){ if(!appData.connectorLib[s])appData.connectorLib[s]={}; appData.connectorLib[s][m]=parseInt(p); } }
+                    else { const c=r.Category||r['分类'], s=r.Signal||r['信号']; if(c&&s){ if(!appData.signalLib[c])appData.signalLib[c]=[]; if(!appData.signalLib[c].includes(s))appData.signalLib[c].push(s); } }
+                });
+                save(); type==='connector'?renderLibTree():renderSigLibTree(); alert("完成");
+            } catch(e){alert("失败");}
+        }; reader.readAsArrayBuffer(file); input.value='';
+    }
+    function exportLibToExcel(type) {
+        const wb=XLSX.utils.book_new(); const data=[];
+        if(type==='connector') { for(let s in appData.connectorLib) for(let m in appData.connectorLib[s]) data.push({"系列":s,"型号":m,"芯数":appData.connectorLib[s][m]}); }
+        else { for(let c in appData.signalLib) appData.signalLib[c].forEach(s=>data.push({"分类":c,"信号":s})); }
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(data), "Lib"); XLSX.writeFile(wb, "Lib.xlsx");
+    }
+
+    function toggleColorMode() { appData.colorMode = document.getElementById('chkColorMode').checked; save(); render(); }
+    function resetProject() { if(confirm("清空?")) { appData.units=[]; save(); addUnit(); render(); } }
+    
+    // [修改] 快速平滑滚动辅助函数 (duration 默认 400ms，轻快不拖沓)
+    function fastScrollTo(element, duration = 400) {
+        const container = document.getElementById('workspace');
+        if (!element || !container) return;
+
+        const start = container.scrollTop;
+        // 目标位置：让元素位于容器中间
+        const target = element.offsetTop - (container.clientHeight / 2) + (element.clientHeight / 2);
+        const change = target - start;
+        let startTime = 0;
+
+        function animate(currentTime) {
+            if (!startTime) startTime = currentTime;
+            const timeElapsed = currentTime - startTime;
+
+            if (timeElapsed < duration) {
+                // Ease-in-out quadratic 缓动算法
+                let val = timeElapsed / (duration / 2);
+                let scrollVal;
+                if (val < 1) {
+                    scrollVal = change / 2 * val * val + start;
+                } else {
+                    val--;
+                    scrollVal = -change / 2 * (val * (val - 2) - 1) + start;
+                }
+                container.scrollTop = scrollVal;
+                requestAnimationFrame(animate);
+            } else {
+                container.scrollTop = start + change; // 确保终点准确
+            }
+        }
+        requestAnimationFrame(animate);
+    }
+    
+    function scrollToUnit(uIdx) { 
+        const el = document.getElementById(`unit-box-${uIdx}`); 
+        if(el) fastScrollTo(el, 300); // 导航点击也用这个，稍快一点
+    }
+    
+    function toggleUnitCollapse(uIdx, e) { if(e) e.stopPropagation(); appData.units[uIdx].collapsed = !appData.units[uIdx].collapsed; save(); renderNav(); }
+    function getNextDesignator(unit) { let max=0; unit.connectors.forEach(c=>{ if(c.designator.startsWith('X')) { const n=parseInt(c.designator.substring(1)); if(!isNaN(n)&&n>max)max=n; } }); return `X${String(max+1).padStart(2,'0')}`; }
+    function changeSeries(u, c, v) { const conn=appData.units[u].connectors[c]; conn.series=v; const d=appData.connectorLib[v]; conn.model=d?Object.keys(d)[0]:""; syncPins(conn); save(); render(); }
+    function changeModel(u, c, v) { const conn=appData.units[u].connectors[c]; conn.model=v; syncPins(conn); save(); render(); }
+    function deleteItem(arr, i) { if(confirm("删除?")) { arr.splice(i,1); save(); render(); } }
+    function syncPins(conn) {
+        const target = (appData.connectorLib[conn.series] && appData.connectorLib[conn.series][conn.model]) || 0;
+        if(target===0)return;
+        if(conn.pins.length < target) for(let i=conn.pins.length+1; i<=target; i++) conn.pins.push({ no: String(i), signal: "NC", remark: "", voltage: "", current: "", destUnit: "", destConn: "", isUsed: false });
+        else if(conn.pins.length > target) conn.pins = conn.pins.slice(0, target);
+    }
+    function exportJSON() { 
+        const ts = new Date().toISOString().slice(0,10).replace(/-/g,''); appData.exportTime = ts;
+        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(appData,null,2)], {type:'application/json'})); a.download = `${appData.project}_${ts}.json`; a.click();
+    }
+    function importJSON(ipt) {
+        const fr=new FileReader(); fr.onload=e=>{ try { appData=JSON.parse(e.target.result); if(!appData.connectorLib) appData.connectorLib=JSON.parse(JSON.stringify(DEFAULT_CONN_LIB)); save(); render(); alert("导入成功"); } catch(e){alert("错误");} }; fr.readAsText(ipt.files[0]);
+    }
+
+    // [修改] 导航渲染：增加 ID 以便反向索引
+    function renderNav() {
+        const nav = document.getElementById('nav-tree'); nav.innerHTML = '';
+        appData.units.forEach((unit, uIdx) => {
+            const group = document.createElement('div'); group.className = 'nav-unit-group';
+            group.innerHTML = `<div class="nav-unit-title"><span class="nav-icon-area" onclick="toggleUnitCollapse(${uIdx}, event)">${unit.collapsed?'▶':'▼'}</span><span class="nav-text-area" onclick="scrollToUnit(${uIdx})">${unit.refDes} | ${unit.name}</span></div>`;
+            if(!unit.collapsed) {
+                const list = document.createElement('div'); list.className = 'nav-conn-list';
+                unit.connectors.forEach((conn, cIdx) => {
+                    const item = document.createElement('div'); item.className = 'nav-conn-item';
+                    item.id = `nav-item-${uIdx}-${cIdx}`; // 关键：增加ID
+                    item.innerHTML = `<div class="nav-left"><span style="font-weight:bold">${conn.designator}</span>${conn.connName?` <span style="color:#f39c12">(${conn.connName})</span>`:""}</div><div class="nav-model">${conn.model.split(' ')[0]}</div>`;
+                    item.onclick = (e) => { 
+                        e.stopPropagation(); highlightNav(uIdx, cIdx);
+                        const el = document.getElementById(`conn-${uIdx}-${cIdx}`); 
+                        if(el) { 
+                            fastScrollTo(el); // 使用自定义快速滚动
+                            el.classList.remove('highlight-target'); 
+                            void el.offsetWidth; 
+                            el.classList.add('highlight-target'); 
+                        }
+                    };
+                    list.appendChild(item);
+                }); group.appendChild(list);
+            } nav.appendChild(group);
+        });
+    }
+
+    // [新增] 独立的高亮导航函数
+    function highlightNav(uIdx, cIdx) {
+        document.querySelectorAll('.nav-conn-item').forEach(i=>i.classList.remove('active')); 
+        const navItem = document.getElementById(`nav-item-${uIdx}-${cIdx}`);
+        if(navItem) {
+            navItem.classList.add('active');
+            navItem.scrollIntoView({block: 'nearest', behavior: 'smooth'}); // 确保侧边栏也滚到可见位置
+        }
+    }
+
+    function toggleAllPins(uIdx, cIdx, status) { appData.units[uIdx].connectors[cIdx].pins.forEach(p => p.isUsed = status); save(); render(); }
+
+    // [修改] 跳转逻辑：增加导航栏同步和自动展开
+    function jumpToTarget(uRef, cRef) {
+        if (!uRef || !cRef) { alert("⚠️ 请先选择 [去向单机] 和 [去向连接器]！"); return; }
+        const uIdx = appData.units.findIndex(u => u.refDes === uRef);
+        if (uIdx === -1) { alert(`❌ 未找到单机: ${uRef}`); return; }
+        const cIdx = appData.units[uIdx].connectors.findIndex(c => c.designator === cRef);
+        if (cIdx === -1) { alert(`❌ 在单机 ${uRef} 中未找到连接器: ${cRef}`); return; }
+        
+        const targetId = `conn-${uIdx}-${cIdx}`;
+        
+        // 1. 如果目标单机被折叠，强制展开
+        let needRender = false;
+        if (appData.units[uIdx].collapsed) {
+            appData.units[uIdx].collapsed = false;
+            needRender = true;
+        }
+
+        if (needRender) {
+            save();
+            render(); // 重新渲染以创建DOM
+            // 延时等待DOM生成
+            setTimeout(() => executeJump(targetId, uIdx, cIdx), 50);
+        } else {
+            executeJump(targetId, uIdx, cIdx);
+        }
+    }
+
+    function executeJump(targetId, uIdx, cIdx) {
+        const el = document.getElementById(targetId);
+        if (el) {
+            // 2. 页面快速滑动
+            fastScrollTo(el);
+            
+            // 3. 导航栏同步高亮
+            highlightNav(uIdx, cIdx);
+
+            // 4. 内容块闪烁动画
+            el.classList.remove('highlight-target');
+            void el.offsetWidth;
+            el.classList.add('highlight-target');
+        } else {
+            alert("目标位置不可见，可能已被删除。");
+        }
+    }
+
+    function render() {
+        renderNav(); const ws = document.getElementById('workspace'); ws.innerHTML = '';
+        const LIB = appData.connectorLib; const allUnits = appData.units.map(u => u.refDes).filter(d => d);
+        appData.units.forEach((unit, uIdx) => {
+            const uBox = document.createElement('div'); uBox.className = 'unit-box'; uBox.id = `unit-box-${uIdx}`;
+            if(appData.colorMode) uBox.style.backgroundColor = MACARON_COLORS[uIdx % MACARON_COLORS.length];
+            uBox.innerHTML = `<div class="unit-header-panel"><div class="ctrl-grp"><label>单机代号</label><input class="w-code" value="${unit.refDes}" onchange="appData.units[${uIdx}].refDes=this.value;save();render();"></div><div class="ctrl-grp" style="flex:1"><label>单机名称</label><input class="w-name-short" value="${unit.name}" onchange="appData.units[${uIdx}].name=this.value;save();renderNav();"></div><button class="btn btn-info" onclick="exportUnitToExcel(${uIdx})">📥 Excel导出</button><button class="btn btn-info" onclick="triggerUnitImport(${uIdx})">📂 Excel导入</button><span style="border-right:1px solid #ccc; height:20px; margin:0 5px;"></span><button class="btn btn-danger-light" onclick="deleteItem(appData.units, ${uIdx})">删除</button><button class="btn btn-success" onclick="addConnector(${uIdx})">+ 添加连接器</button></div><div id="u-body-${uIdx}" style="padding:10px 0;"></div>`;
+            ws.appendChild(uBox);
+            const uBody = uBox.querySelector(`#u-body-${uIdx}`);
+            unit.connectors.forEach((conn, cIdx) => {
+                const cDiv = document.createElement('div'); cDiv.className = 'conn-block'; cDiv.id = `conn-${uIdx}-${cIdx}`;
+                let sOpts="", mOpts="", warnings=[];
+                const seen=new Set(); let dup=false; conn.pins.forEach(p=>{if(seen.has(p.no))dup=true; seen.add(p.no);}); if(dup) warnings.push(`<span class="conn-warning warn-error">⚠️ 节点重复</span>`);
+                if(LIB[conn.series]) {
+                    sOpts = Object.keys(LIB).map(k=>`<option value="${k}" ${k===conn.series?'selected':''}>${k}</option>`).join('');
+                    if(LIB[conn.series][conn.model]) {
+                        mOpts = Object.keys(LIB[conn.series]).map(m=>`<option value="${m}" ${m===conn.model?'selected':''}>${m}</option>`).join('');
+                        if(LIB[conn.series][conn.model]!==conn.pins.length) warnings.push(`<span class="conn-warning warn-error">⚠️ Pin数不符</span>`);
+                    } else { mOpts=`<option selected>${conn.model}</option>`+Object.keys(LIB[conn.series]).map(m=>`<option>${m}</option>`).join(''); warnings.push(`<span class="conn-warning warn-unknown">⚠️ 未知型号</span>`); }
+                } else { sOpts=`<option selected>${conn.series}</option>`+Object.keys(LIB).map(k=>`<option>${k}</option>`).join(''); mOpts=`<option selected>${conn.model}</option>`; warnings.push(`<span class="conn-warning warn-unknown">⚠️ 未知型号</span>`); }
+                const allUsed = conn.pins.length>0 && conn.pins.every(p=>p.isUsed);
+                const pinRows = conn.pins.map((p, pIdx) => {
+                    let tHtml = '<option value="">-</option>';
+                    if(p.destUnit) { const tU = appData.units.find(u => u.refDes === p.destUnit); if(tU) tU.connectors.forEach(tc => { tHtml += `<option value="${tc.designator}" ${tc.designator===p.destConn?'selected':''}>${tc.designator}</option>`; }); }
+                    return `<tr class="${p.isUsed?'tr-used':''}"><td><input value="${p.no}" readonly style="font-weight:bold;"></td><td style="display:flex;"><input style="width:calc(100% - 30px)" id="sig-input-${uIdx}-${cIdx}-${pIdx}" value="${p.signal}" onchange="appData.units[${uIdx}].connectors[${cIdx}].pins[${pIdx}].signal=this.value;save()"><button class="btn-picker" onclick="openSignalPicker(${uIdx},${cIdx},${pIdx})">≡</button></td><td><input list="volt-list" value="${p.voltage||''}" onchange="appData.units[${uIdx}].connectors[${cIdx}].pins[${pIdx}].voltage=this.value;save()"></td><td><input type="number" step="1" value="${p.current||''}" onchange="appData.units[${uIdx}].connectors[${cIdx}].pins[${pIdx}].current=this.value;save()"></td><td><select onchange="appData.units[${uIdx}].connectors[${cIdx}].pins[${pIdx}].destUnit=this.value;appData.units[${uIdx}].connectors[${cIdx}].pins[${pIdx}].destConn='';save();render();"><option value="">-</option>${allUnits.map(d=>`<option value="${d}" ${d===p.destUnit?'selected':''}>${d}</option>`).join('')}</select></td><td><div style="display:flex; height:100%; align-items:center;"><select style="flex:1;" onchange="appData.units[${uIdx}].connectors[${cIdx}].pins[${pIdx}].destConn=this.value;save();">${tHtml}</select><button class="btn-jump" title="跳转" onclick="jumpToTarget('${p.destUnit}', '${p.destConn}')">➔</button></div></td><td><input value="${p.remark}" onchange="appData.units[${uIdx}].connectors[${cIdx}].pins[${pIdx}].remark=this.value;save()"></td><td style="text-align:center;"><input type="checkbox" ${p.isUsed?'checked':''} onchange="appData.units[${uIdx}].connectors[${cIdx}].pins[${pIdx}].isUsed=this.checked;save();render();" style="width:20px; height:20px; cursor:pointer;"></td></tr>`;
+                }).join('');
+                cDiv.innerHTML = `<div class="ctrl-row"><div class="ctrl-grp"><label>代号</label><select class="w-code" onchange="appData.units[${uIdx}].connectors[${cIdx}].designator=this.value;save();renderNav();">${REF_OPTS.map(r=>`<option ${r===conn.designator?'selected':''}>${r}</option>`).join('')}</select></div><div class="ctrl-grp"><label>名称</label><input class="w-name-short" value="${conn.connName}" onchange="appData.units[${uIdx}].connectors[${cIdx}].connName=this.value;save();renderNav();"></div><div class="ctrl-grp"><label>系列</label><select class="w-series" onchange="changeSeries(${uIdx},${cIdx},this.value)">${sOpts}</select></div><div class="ctrl-grp"><label>型号</label><select class="w-model" onchange="changeModel(${uIdx},${cIdx},this.value)">${mOpts}</select></div><div class="conn-warning-container">${warnings.join('')}</div><div class="ctrl-grp" style="margin-left:auto;"><label>&nbsp;</label><button class="btn btn-text btn-danger-light" onclick="deleteItem(appData.units[${uIdx}].connectors, ${cIdx})">移除</button></div></div><table class="pin-table"><thead><tr><th width="50">Pin</th><th>信号名</th><th width="70">电压</th><th width="60">电流</th><th width="120">去向单机</th><th width="100">去向接口</th><th>备注</th><th width="40" style="text-align:center;"><input type="checkbox" ${allUsed?'checked':''} onchange="toggleAllPins(${uIdx},${cIdx},this.checked)" style="width:16px; height:16px; cursor:pointer;"></th></tr></thead><tbody>${pinRows}</tbody></table>`;
+                uBody.appendChild(cDiv);
+            });
+        });
+    }
+
+    let currentSignalTarget = null;
+    function openSignalPicker(uIdx, cIdx, pIdx) { currentSignalTarget = { uIdx, cIdx, pIdx }; document.getElementById('signalModal').style.display = 'flex'; const c=document.getElementById('signalContent'); c.innerHTML=''; for(let cat in appData.signalLib){ const d=document.createElement('div'); d.className='sig-category'; d.innerHTML=`<div class="sig-cat-title">${cat}</div>`; const g=document.createElement('div'); g.className='sig-grid'; appData.signalLib[cat].forEach(s=>{ const i=document.createElement('div'); i.className='sig-item'; i.innerText=s; i.onclick=()=>{appData.units[uIdx].connectors[cIdx].pins[pIdx].signal=s; save(); document.getElementById(`sig-input-${uIdx}-${cIdx}-${pIdx}`).value=s; closeModal('signalModal');}; g.appendChild(i); }); d.appendChild(g); c.appendChild(d); } }
+    function addUnit() { appData.units.push({ id: Date.now(), refDes: "XXX", name: "设备", collapsed: false, connectors: [] }); save(); render(); setTimeout(() => document.getElementById('workspace').lastElementChild.scrollIntoView(), 100); }
+    function addConnector(uIdx) { const unit=appData.units[uIdx]; const ds=Object.keys(appData.connectorLib)[0]; const dm=ds?Object.keys(appData.connectorLib[ds])[0]:""; const nc={ id: Date.now(), designator: getNextDesignator(unit), connName: "", series: ds, model: dm, pins: [] }; syncPins(nc); unit.connectors.push(nc); unit.collapsed=false; save(); render(); }
+</script>
+</body>
+</html>

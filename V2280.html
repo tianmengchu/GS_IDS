@@ -19,34 +19,100 @@
             --purple: #9b59b6;
             --info: #17a2b8;
         }
-        body { font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; margin: 0; background: var(--bg); display: flex; height: 100vh; overflow: hidden; color: var(--text); }
+        body { 
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; 
+            margin: 0; 
+            background: var(--bg); 
+            display: flex; 
+            height: 100vh; 
+            overflow: hidden; 
+            color: var(--text); 
+        }
 
         /* --- 布局 (Layout) --- */
-        #sidebar { width: var(--sidebar-w); background: var(--primary); color: #ecf0f1; display: flex; flex-direction: column; box-shadow: 2px 0 10px rgba(0,0,0,0.1); user-select: none; }
-        .sb-header { padding: 15px 20px; font-weight: bold; font-size: 1.1rem; border-bottom: 1px solid #34495e; background: #243342; display: flex; align-items: center; justify-content: space-between; }
-        .sb-content { flex: 1; overflow-y: auto; padding-top: 10px; }
-        #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-        header { height: 60px; background: #fff; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
+        #sidebar { 
+            width: var(--sidebar-w); 
+            background: var(--primary); 
+            color: #ecf0f1; 
+            display: flex; 
+            flex-direction: column; 
+            box-shadow: 2px 0 10px rgba(0,0,0,0.1); 
+            user-select: none; 
+        }
+        .sb-header { 
+            padding: 15px 20px; 
+            font-weight: bold; 
+            font-size: 1.1rem; 
+            border-bottom: 1px solid #34495e; 
+            background: #243342; 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+        }
+        .sb-content { 
+            flex: 1; 
+            overflow-y: auto; 
+            padding-top: 10px; 
+        }
+        #main { 
+            flex: 1; 
+            display: flex; 
+            flex-direction: column; 
+            overflow: hidden; 
+        }
+        header { 
+            height: 60px; 
+            background: #fff; 
+            border-bottom: 1px solid var(--border); 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            padding: 0 20px; 
+            box-shadow: 0 2px 5px rgba(0,0,0,0.02); 
+        }
         /* [修改] 移除 scroll-behavior，完全由JS控制滚动速度 */
-        #workspace { flex: 1; overflow-y: auto; padding: 25px; position: relative; }
+        #workspace { 
+            flex: 1; 
+            overflow-y: auto; 
+            padding: 25px; 
+            position: relative; 
+        }
 
         /* --- 单机卡片 (Unit Box) --- */
         .unit-box { 
-            background: #fff; border-radius: 8px; box-shadow: 0 2px 12px rgba(0,0,0,0.05); margin-bottom: 30px; 
+            background: #fff; 
+            border-radius: 8px; 
+            box-shadow: 0 2px 12px rgba(0,0,0,0.05); 
+            margin-bottom: 30px; 
             border: 1px solid #ebeef5;
             transition: background-color 0.3s ease; 
         }
         .unit-header-panel { 
-            padding: 12px 20px; border-bottom: 1px solid rgba(0,0,0,0.05); display: flex; gap: 15px; align-items: center; 
-            background: rgba(255,255,255,0.6); border-radius: 8px 8px 0 0; flex-wrap: wrap;
+            padding: 12px 20px; 
+            border-bottom: 1px solid rgba(0,0,0,0.05); 
+            display: flex; 
+            gap: 15px; 
+            align-items: center; 
+            background: rgba(255,255,255,0.6); 
+            border-radius: 8px 8px 0 0; 
+            flex-wrap: wrap;
         }
         
         /* --- 连接器块 (Connector Block) --- */
         .conn-block { 
-            border: 1px solid #ebeef5; border-radius: 4px; padding: 15px; margin: 15px 20px; 
-            background: #fff; position: relative; transition: all 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.02); 
+            border: 1px solid #ebeef5; 
+            border-radius: 4px; 
+            padding: 15px; 
+            margin: 15px 20px; 
+            background: #fff; 
+            position: relative; 
+            transition: all 0.2s; 
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02); 
         }
-        .conn-block:hover { border-color: #c0c4cc; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .conn-block:hover { 
+            border-color: #c0c4cc; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05); 
+        }
         
         /* 高亮动画：快速闪烁 */
         @keyframes highlight-pulse {
